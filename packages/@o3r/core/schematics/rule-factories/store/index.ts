@@ -19,6 +19,7 @@ const packageJsonPath = path.resolve(__dirname, '..', '..', '..', 'package.json'
 const ngrxEffectsDep = '@ngrx/effects';
 const ngrxEntityDep = '@ngrx/entity';
 const ngrxStoreDep = '@ngrx/store';
+/** @deprecated to be removed in v10 */
 const ngrxStoreLocalstorageDep = 'ngrx-store-localstorage';
 const ngrxRouterStore = '@ngrx/router-store';
 const ngrxRouterStoreDevToolDep = '@ngrx/store-devtools';
@@ -36,7 +37,7 @@ export function updateStore(options: { projectName: string | null }, _rootPath: 
    * Changed package.json start script to run localization generation
    *
    * @param tree
-   * @param _context
+   * @param context
    */
   const updatePackageJson: Rule = (tree: Tree, context: SchematicContext) => {
     const workspaceProject = getProjectFromTree(tree, options.projectName || undefined);
