@@ -1,5 +1,5 @@
 import { execSync, ExecSyncOptions, spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import type { PackageJson } from 'nx/src/utils/package-json';
 import getPidFromPort from 'pid-from-port';
@@ -19,6 +19,8 @@ const execAppOptions: ExecSyncOptions = {
 };
 const registry = 'http://localhost:4873';
 const configFile = path.join(verdaccioFolder, '.npmrc');
+let tempDir: string;
+const o3rVersion = '999.0.0';
 
 /**
  * @param moduleName
@@ -43,7 +45,7 @@ function setupLocalRegistry() {
   beforeAll(() => {
     containerId = execSync(`docker run -d -it --rm --name verdaccio -p 4873:4873 -v ${verdaccioFolder}:/verdaccio/conf verdaccio/verdaccio`, {cwd: currentFolder, stdio: 'pipe'}).toString();
     execSync(`echo registry=${registry} > .npmrc`, {cwd: verdaccioFolder, stdio: 'inherit'});
-    execSync('yarn set:version 999.0.0 --include "!**/!(dist)/package.json" --include !package.json', {cwd: currentFolder, stdio: 'inherit', env: process.env});
+    execSync(`yarn set:version ${o3rVersion} --include "!**/!(dist)/package.json" --include !package.json`, {cwd: currentFolder, stdio: 'inherit', env: process.env});
     execSync(`npx --yes wait-on ${registry}`, {cwd: currentFolder, stdio: 'inherit'});
     execSync(`npx --yes npm-cli-login -u verdaccio -p verdaccio -e test@test.com -r ${registry} --config-path "${configFile}"`, {cwd: currentFolder, stdio: 'inherit'});
     execSync(`yarn run publish --userconfig "${configFile}" --tag=latest --@o3r:registry=${registry} --@ama-sdk:registry=${registry}`,
@@ -51,6 +53,14 @@ function setupLocalRegistry() {
   });
 
   afterAll(() => {
+    if (tempDir) {
+      try {
+        rmSync(tempDir, {recursive: true});
+      } catch (_e) {
+        // eslint-disable-next-line no-console
+        console.error('An error occurred while removing yarn cache folder');
+      }
+    }
     if (containerId) {
       execSync(`docker container stop ${containerId}`, {cwd: currentFolder, stdio: 'inherit'});
     }
@@ -64,7 +74,12 @@ function setupNewApp() {
   beforeAll(() => {
     const packageJson = JSON.parse(readFileSync(packageJsonPath).toString()) as PackageJson;
     const angularVersion = minVersion(packageJson.devDependencies['@angular/core']).version;
-
+    try {
+      tempDir = mkdtempSync(path.join(applicationPath, 'test-app','.yarn', 'cache'));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.log('Failed to create yarn cache file');
+    }
     // Create app with ng new
     execSync('npx rimraf test-app', {cwd: applicationPath, stdio: 'inherit'});
     execSync(`npx --yes -p @angular/cli@${angularVersion} ng new test-app --style=scss --routing --interactive=false --skip-git --package-manager=yarn --skip-install`,
@@ -72,18 +87,23 @@ function setupNewApp() {
       {cwd: applicationPath, stdio: 'inherit', env: {...process.env, NODE_OPTIONS: ''}});
 
     // Set config to target local registry
-    execSync(`npm config set @o3r:registry ${registry} -L project`, execAppOptions);
-    execSync(`npm config set @ama-sdk:registry ${registry} -L project`, execAppOptions);
+    execSync('yarn set version 3.5.0', execAppOptions);
+    execSync(`yarn config set npmScopes['ama-sdk'].npmRegistryServer ${registry}`, execAppOptions);
+    execSync(`yarn config set npmScopes[o3r].npmRegistryServer ${registry}`, execAppOptions);
     execSync('yarn config set enableStrictSsl false', execAppOptions);
     execSync(`yarn config set npmScopes.o3r.npmRegistryServer ${registry}`, execAppOptions);
     execSync('yarn config set unsafeHttpWhitelist localhost', execAppOptions);
-    execSync('yarn set version 1.22.19', execAppOptions);
-    execSync(`yarn config set cache-folder ${path.join(currentFolder, '.cache', 'test-app')}`, execAppOptions);
-    execSync('yarn', execAppOptions);
+    execSync('yarn config set nodeLinker pnp', execAppOptions);
+    if (tempDir) {
+      execSync(`yarn config set cacheFolder ${tempDir}`, execAppOptions);
+    }
+    execSync('yarn config set enableImmutableInstalls false', execAppOptions);
 
     // Run ng add
-    execSync(`yarn ng add @angular/pwa@${angularVersion} --skip-confirmation --interactive=false`, execAppOptions);
-    execSync(`yarn ng add @angular/material@${angularVersion} --skip-confirmation --interactive=false`, execAppOptions);
+    execSync(`yarn add @angular/pwa@${angularVersion}`, execAppOptions);
+    execSync(`yarn ng add @angular/pwa@${angularVersion} --force --skip-confirmation --interactive=false`, execAppOptions);
+    execSync(`yarn add @angular-devkit/schematics@${angularVersion}`, execAppOptions);
+    execSync(`yarn run ng add @angular/material@${angularVersion} --skip-confirmation --interactive=false`, execAppOptions);
   });
 }
 
@@ -92,10 +112,14 @@ describe('new Otter application', () => {
   setupNewApp();
 
   test('should build empty app', () => {
-    execSync(`yarn ng add @ama-sdk/core --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    execSync(`yarn ng add @o3r/dynamic-content --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    execSync(`yarn ng add @o3r/extractors --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    execSync(`yarn ng add @o3r/core --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
+    execSync(`yarn add @o3r/core@${o3rVersion}`, execAppOptions);
+    execSync('yarn ng add @o3r/core --skip-confirmation --interactive=false --force --verbose', execAppOptions);
+    execSync(`yarn add @ama-sdk/core@${o3rVersion}`, execAppOptions);
+    execSync('yarn ng add @ama-sdk/core --skip-confirmation --interactive=false --force --verbose', execAppOptions);
+    execSync(`yarn add @o3r/dynamic-content@${o3rVersion}`, execAppOptions);
+    execSync('yarn ng add @o3r/dynamic-content --skip-confirmation --interactive=false --force --verbose', execAppOptions);
+    execSync(`yarn add @o3r/extractors@${o3rVersion}`, execAppOptions);
+    execSync('yarn ng add @o3r/extractors --skip-confirmation --force --interactive=false --registry ${registry} --verbose', execAppOptions);
     expect(() => execSync('yarn build', execAppOptions)).not.toThrow();
 
     execSync('yarn ng g @o3r/core:store-entity-async --interactive=false --store-name="test-entity-async" --model-name="Bound" --model-id-prop-name="id"', execAppOptions);

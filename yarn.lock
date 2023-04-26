@@ -6986,7 +6986,6 @@ __metadata:
     "@angular-devkit/core": ~15.2.0
     "@angular-devkit/schematics": ~15.2.0
     "@angular/cli": ~15.2.0
-    "@schematics/angular": ~15.2.0
   peerDependenciesMeta:
     "@angular-devkit/core":
       optional: true

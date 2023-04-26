@@ -22,7 +22,7 @@ export interface NgAddPackageOptions {
 }
 
 export class NodePackageNgAddTask implements TaskConfigurationGenerator<NodePackageTaskOptions> {
-  public quiet = true;
+  public quiet = false;
 
   constructor(public packageName: string, public options?: NgAddPackageOptions) {}
 

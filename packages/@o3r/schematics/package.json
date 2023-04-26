@@ -19,8 +19,7 @@
   "peerDependencies": {
     "@angular-devkit/core": "~15.2.0",
     "@angular-devkit/schematics": "~15.2.0",
-    "@angular/cli": "~15.2.0",
-    "@schematics/angular": "~15.2.0"
+    "@angular/cli": "~15.2.0"
   },
   "peerDependenciesMeta": {
     "@angular-devkit/core": {
@@ -28,7 +27,10 @@
     }
   },
   "dependencies": {
+    "@angular-devkit/core": "~15.2.0",
+    "@angular-devkit/schematics": "~15.2.0",
     "@o3r/dev-tools": "workspace:^",
+    "@schematics/angular": "~15.2.0",
     "comment-json": "^4.1.0",
     "globby": "^11.1.0",
     "minimatch": "^6.1.6",

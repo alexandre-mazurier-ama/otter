@@ -1,15 +1,16 @@
-import { chain, Rule, Tree } from '@angular-devkit/schematics';
-import { getFilesInFolderFromWorkspaceProjectsInTree, removePackages } from '@o3r/schematics';
+import {Rule, chain, Tree} from '@angular-devkit/schematics';
 import * as ts from 'typescript';
 
-/**
- * Add Otter ama-sdk-core to an Angular Project
- *
- * @param options
- */
 export function ngAdd(): Rule {
+
+  const removeImports = async () => {
+    const {removePackages} = await import('@o3r/schematics');
+    return removePackages(['@dapi/sdk-core']);
+  };
+
   /* ng add rules */
-  const updateImports = (tree: Tree) => {
+  const updateImports = async (tree: Tree) => {
+    const {getFilesInFolderFromWorkspaceProjectsInTree} = await import('@o3r/schematics');
     const files = getFilesInFolderFromWorkspaceProjectsInTree(tree, '', 'ts');
     files.forEach((file) => {
       const sourceFile = ts.createSourceFile(
@@ -30,11 +31,11 @@ export function ngAdd(): Rule {
         });
         tree.commitUpdate(recorder);
       }
+      return tree;
     });
   };
   return chain([
-    removePackages(['@dapi/sdk-core']),
+    removeImports,
     updateImports
   ]);
-
 }
